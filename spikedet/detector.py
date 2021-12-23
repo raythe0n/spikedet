@@ -70,9 +70,9 @@ class SpikeDetector:
         return dets.detach().numpy()
 
 
-def load_false_covid():
+def load_test():
     data = []
-    for path in glob.glob(os.path.join(DATA_DIR, 'FALSE COVID/*.txt')):
+    for path in glob.glob(os.path.join(DATA_DIR, 'TEST/*.txt')):
         basename = os.path.basename(path)
         id = os.path.splitext(basename)[0]
         csv = pd.read_csv(path, sep='\t', header=None, names=['time', 'timestamp', 'value'])
@@ -86,7 +86,7 @@ def main():
     #detector = SpikeDetector(DATA_DIR / 'checkpoints/b22982f8-6361-11ec-a2b7-18c04d961554/FOLD_0/best.ckpt', device='cpu')
     detector = SpikeDetector(DATA_DIR / 'spikedet.pkl', device='cpu', threshold=0.5)
     detector.save_model(DATA_DIR / 'spikedet.pkl')
-    data = load_false_covid()
+    data = load_test()
 
     tic = time.time()
     pred, prob = detector.predict(data['value'].to_numpy(), return_prob=True)
