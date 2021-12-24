@@ -100,7 +100,7 @@ class SpikeDetectorOnline(SpikeDetector):
             pred = self._run_model(batch)
             pred_indices = indices[..., self.model.padding: -self.model.padding] + self.data_index
 
-            shifts = batch_size * win_det + self.model.padding
+            shifts = batch_size * win_det #+ self.model.padding
             self.ring = torch.roll(self.ring, -shifts, dims=0)
             self.underflow_index -= shifts
             self.data_index += shifts
