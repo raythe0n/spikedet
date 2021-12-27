@@ -25,7 +25,7 @@ from spikedet.dataset.dataset import CardioDataset
 from spikedet.dataset.folds import split_dataframe
 
 from spikedet.model.spike_net import SpikeNet
-from spikedet import DATA_DIR, NUM_CORES, CHECKPOINTS_DIR, LOGS_DIR, TRAIN_DATA_PATH
+from spikedet import DATA_DIR, NUM_CORES, CHECKPOINTS_DIR, LOGS_DIR, TRAIN_DATA_PATH, VAL_DATA_PATH, FOLDS_TRAIN_DATA_PATH
 
 from spikedet import CARDIO_RR_MEAN, CARDIO_RR_SCALE
 
@@ -42,9 +42,9 @@ def train(name, train_ds, val_ds, batch_size=1024, num_worker=0, pruning_callbac
         val_ds, num_workers=num_worker, pin_memory=False, shuffle=False, batch_size=batch_size
     )
 
-    model = SpikeNet(win_size=train_ds.win_size, padding=train_ds.padding)
-    system = CardioSystem(model, train_weight=train_ds.pos_weight() * 0.25,
-                          val_weight=val_ds.pos_weight())
+    model = SpikeNet(padding=train_ds.padding)
+    system = CardioSystem(model, train_weight=train_ds.pos_weight() * 0.5,
+                             val_weight=val_ds.pos_weight())
 
 
     experiment_checkpoints_dir = f"{CHECKPOINTS_DIR}/{name}"
@@ -89,21 +89,15 @@ def train_folds(df, win_size=32, padding=4, batch_size=1024, num_worker=0):
         train(name, train_ds, val_ds, batch_size, num_worker)
 
 
-def train_all(df, win_size = 32, padding=4, batch_size=1024, num_worker=NUM_CORES):
-    dataset_ids = df["id"].unique()
-    random.shuffle(dataset_ids)
+def train_final(win_size = 32, padding=4, batch_size=1024, num_worker=NUM_CORES):
+    train_df = pd.read_csv(TRAIN_DATA_PATH)
+    val_df = pd.read_csv(VAL_DATA_PATH)
 
-    size = int(len(dataset_ids) * 0.05)
-    val_ids = dataset_ids[:size]
-    train_ids = dataset_ids[size:]
 
-    train_df = df.loc[df["id"].isin(train_ids)].reset_index(drop=True).copy()
-    val_df = df.loc[df["id"].isin(val_ids)].reset_index(drop=True).copy()
+    train_ds = CardioDataset(train_df['x'].values, train_df['y'].values, win_size, padding=padding, aug=0.5)
+    val_ds = CardioDataset(val_df['x'].values, val_df['y'].values, win_size, padding=padding)
 
-    train_ds = CardioDataset(train_df, win_size, padding=padding, aug=0.5)
-    val_ds = CardioDataset(val_df, win_size, padding=padding)
-
-    train(f"{uuid1()}/ALL", train_ds, val_ds, batch_size)
+    train(f"{uuid1()}/FINAL", train_ds, val_ds, batch_size)
 
 def update_scaler(x):
     scaler = RobustScaler(quantile_range=(15, 85))
@@ -114,8 +108,10 @@ def update_scaler(x):
 
 
 def main():
-    df = pd.read_csv(TRAIN_DATA_PATH)
-    train_folds(df)
+    #df = pd.read_csv(FOLDS_TRAIN_DATA_PATH)
+    #train_folds(df)
+    train_final()
+
 
 
 if __name__ == "__main__":

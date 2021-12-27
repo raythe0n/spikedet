@@ -59,4 +59,5 @@ def remove_duplicates(actual, proba, indices, reduce='max'):
     #Last value will be taked into account only
     perm = indices.new_empty(indices.size(0)).scatter_(0, indices, perm)
     perm = perm[:indices[-1]+1]
+    print(perm)
     return actual[perm], proba[perm]

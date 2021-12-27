@@ -17,7 +17,7 @@ from spikedet.core.utils import fbeta_search, threshold_search, remove_duplicate
 
 class CardioSystem(pl.LightningModule):
     def __init__(
-        self, model, train_weight=1, val_weight = 1, lr=1e-2, alpha=0.5 ):
+        self, model, train_weight=1, val_weight = 1, lr=1e-3, alpha=0.5 ):
         super().__init__()
 
         self.save_hyperparameters(
@@ -84,9 +84,9 @@ class CardioSystem(pl.LightningModule):
         proba = torch.cat([out["proba"].flatten() for out in outputs])
         indices = torch.cat([out["indices"].flatten() for out in outputs])
 
-        actual_reduced, proba_reduced  = remove_duplicates(actual, proba, indices)
+        #actual_reduced, proba_reduced  = remove_duplicates(actual, proba, indices)
 
-        pred = torch.sigmoid(proba_reduced)
+        #pred = torch.sigmoid(proba_reduced)
         y_true = actual.cpu().numpy()
         y_score = torch.sigmoid(proba).cpu().numpy()
 
@@ -100,13 +100,13 @@ class CardioSystem(pl.LightningModule):
 
         self.thres = th
         #Store validation data
-        target = actual_reduced.cpu().numpy()
+        #target = actual_reduced.cpu().numpy()
 
-        pred = pred.cpu().numpy()
-        dets = np.zeros_like(target)
-        dets[pred > th] = 1
+        #pred = pred.cpu().numpy()
+        #dets = np.zeros_like(target)
+        #dets[pred > th] = 1
 
-        self.val_data = pd.DataFrame({'dets':dets, 'pred':pred, 'target':target})
+        #self.val_data = pd.DataFrame({'dets':dets, 'pred':pred, 'target':target})
 
         self.log(f"{mode}/thresh", best_th.item())
         self.log(f"{mode}/f1_score", best_score.item())

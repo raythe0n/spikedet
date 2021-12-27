@@ -65,12 +65,12 @@ class Residual(nn.Module):
         #        nn.Conv1d(in_channels=in_channels, out_channels=hidden_dim, kernel_size=1, bias=False ),
         #    ]
 
-        layers += [
+        layers = [
             # pw
             nn.Conv1d(in_channels=in_channels, out_channels=hidden_dim, kernel_size=1, bias=False),
             # dw
             nn.BatchNorm1d(hidden_dim),
-            nn.Conv1d(hidden_dim, hidden_dim, kernel_size, (kernel_size - 1) // 2, dilation=dilation,
+            nn.Conv1d(hidden_dim, hidden_dim, kernel_size, dilation=dilation,
                       padding=(kernel_size - 1) * dilation // 2, groups=hidden_dim, bias=False),
 
             nn.GELU(),
@@ -83,13 +83,44 @@ class Residual(nn.Module):
 
     def forward(self, x):
         y = self.conv(x)
+        z = None
+        if self.residual is not None:
+            z = self.residual(y)
+            if z.shape == x.shape:
+                z += x
 
-        z = x + self.residual(y) if self.residual is not None else x
         #Remove
         y = y[..., self.padding:-self.padding]
         s = self.skip(y)
         return (z, s)
 
+class Column(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size):
+        super(Column, self).__init__()
+
+
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels=32,
+                      out_channels=32,
+                      kernel_size=1,
+                      # bias=bias),
+                      bias=True),
+
+            # nn.BatchNorm1d(residual_channels),
+            nn.GELU(),
+        )
+
+
+
+        self.layers = nn.ModuleList([nn.Conv1d(in_channels, 8, kernel_size, dilation=i + 1,
+                      padding=(kernel_size - 1) * (i+1) // 2, bias=False) for i in range(4)])
+
+    def forward(self, x):
+        y = [layer(x) for layer in self.layers]
+        y = torch.concat(y, dim=-2)
+        y = self.conv1(y)
+
+        return y
 
 '''
 SpikeNet Model
@@ -102,11 +133,11 @@ class SpikeNet(nn.Module):
                  blocks=2,
                  dilation_channels=40,
                  residual_channels=32,
-                 skip_channels=64,
+                 skip_channels=72,
                  classes=1,
                  kernel_size=3,
                  padding=4,
-                 dilation_factor=1.0,#2/3 #1
+                 dilation_factor=1,#1.0,#2/3 #1
                  bias=False):
 
         super(SpikeNet, self).__init__()
@@ -134,6 +165,7 @@ class SpikeNet(nn.Module):
 
         in_channels = 1
         out_channels = residual_channels
+
 
         for b, last_block in lookahead(range(blocks)):
             additional_scope = kernel_size - 1
@@ -208,6 +240,14 @@ class SpikeNet(nn.Module):
     def forward(self, input):
         x = input.unsqueeze(-2)
         skip = 0
+
+        #fft = torch.fft.fft(input, dim=-1)
+        #fft = torch.view_as_real(fft)
+        #fft = fft.transpose(-1, -2)
+
+        #x = torch.concat([x, fft], dim=-2)
+
+        #x = self.start(x)
 
         for i in range(self.blocks * self.layers):
             x, s = self.filters[i](x)

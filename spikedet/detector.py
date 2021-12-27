@@ -122,9 +122,10 @@ def load_test():
 
     return pd.concat(data, ignore_index=True)
 
-def test_online_detector():
+def test_online_detector(model_path):
     data = load_test()
-    det = SpikeDetectorOnline(DATA_DIR / 'spikedet.pkl', device='cpu', threshold=0.5)
+    det = SpikeDetectorOnline(model_path, device='cpu', threshold=0.65)
+    det.save_model(DATA_DIR / 'spikedet.pkl')
     x = data['value'].to_numpy()
     splits = np.array_split(x, 1000)
 
@@ -135,9 +136,9 @@ def test_online_detector():
             if len(detections) > 0:
                 print(detections)
 
-def test_detector():
+def test_detector(model_path):
     data = load_test()
-    det = SpikeDetector(DATA_DIR / 'spikedet.pkl', device='cpu', threshold=0.5)
+    det = SpikeDetector(model_path, device='cpu', threshold=0.65)
     x = data['value'].to_numpy()
     tic = time.time()
     pred, prob = det.predict(x, return_prob=True)
@@ -154,9 +155,11 @@ def test_detector():
 
 
 def main():
-
-    test_online_detector()
-    test_detector()
+    model_path = DATA_DIR / 'spikedet.pkl'
+   # model_path = DATA_DIR / 'checkpoints' / "6cc21d76-6703-11ec-bdd3-18c04d961554/FINAL/best.ckpt"
+    #model_path = DATA_DIR / 'checkpoints' / "72b0efdc-670d-11ec-9b97-18c04d961554/FINAL/best.ckpt"
+    test_online_detector(model_path)
+    test_detector(model_path)
 
 
 

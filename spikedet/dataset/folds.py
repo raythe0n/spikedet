@@ -2,7 +2,7 @@ import os
 from sklearn.model_selection import KFold
 import json
 
-from spikedet import TRAIN_SPLITTED_DATA_PATH, DATA_DIR, NUM_CORES, CHECKPOINTS_DIR, LOGS_DIR, FULL_TRAIN_DATA_PATH
+from spikedet import DATA_DIR
 
 def make_splits(ids, splits=10):
     kf = KFold(n_splits=splits, shuffle=True)
@@ -32,7 +32,7 @@ def split_dataframe(df, folds_file='folds.json'):
     folds = []
     for i, (tr, val) in enumerate(zip(splits['train'], splits['val'])):
 
-        train_df = df.loc[df["id"].isin(tr)].sort_index().reset_index(drop=True)
+        train_df = df.loc[~df["id"].isin(val)].sort_index().reset_index(drop=True)
         val_df = df.loc[df["id"].isin(val)].sort_index().reset_index(drop=True)
 
         folds.append(dict(train=train_df, val=val_df))

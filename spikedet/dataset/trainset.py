@@ -18,32 +18,35 @@ import glob
 
 from datetime import datetime as dt
 
-def save_to_traineset(df, path, value_name = 'x', aux_name = 'y', label_name = 'spike', label_map={1:'spike'}):
+def save_to_traineset(df, path, value_name = 'x', aux_name = None, label_name = None, label_map={1:'spike'}):
 
     time = pd.to_datetime(pd.Series(df.index), unit='s')
     # time = time.map(lambda x: dt.strftime(x, '%Y-%m-%dT%H:%M:%S.%fZ'))
-    time = time.map(lambda x: dt.isoformat(x, timespec='milliseconds') + 'Z')
-
-    serie_rr = pd.Series(['RR']).repeat(time.size).reset_index(drop=True)
-    serie_markup = pd.Series(['markup']).repeat(time.size).reset_index(drop=True)
-
-    value = pd.concat([df[value_name], df[aux_name]], axis=0, ignore_index=True)
-
+    timestamp = time.map(lambda x: dt.isoformat(x, timespec='milliseconds') + 'Z')
     label = pd.Series(['']).repeat(time.size).reset_index(drop=True)
-    for k, v in label_map.items():
-        label[df[label_name] == k] = v
+    series = pd.Series(['RR']).repeat(time.size).reset_index(drop=True)
+    value = df[value_name]
 
-    label = pd.concat([label, label], axis=0, ignore_index=True)
+    if label_name is not None:
+        for k, v in label_map.items():
+            label[df[label_name] == k] = v
 
-    series = pd.concat([serie_rr, serie_markup], axis=0, ignore_index=True)
-    timestamp = pd.concat([time, time], axis=0, ignore_index=True)
+    if aux_name is not None:
+        serie_aux = pd.Series([aux_name]).repeat(time.size).reset_index(drop=True)
+        value = pd.concat([value, df[aux_name]], axis=0, ignore_index=True)
+        series = pd.concat([series, serie_aux], axis=0, ignore_index=True)
+        timestamp = pd.concat([timestamp, timestamp], axis=0, ignore_index=True)
+        label = pd.concat([label, label], axis=0, ignore_index=True)
 
-    trainset_df = pd.DataFrame(dict(series=series, timestamp=timestamp, value=value, label=label))
+
+    trainset_dict = dict(series=series, timestamp=timestamp, value=value, label=label)
+
+    trainset_df = pd.DataFrame(trainset_dict)
     trainset_df.sort_values(['timestamp'], inplace=True)
     trainset_df.to_csv(path, sep=',', index=False)
 
 
-def save_to_traineset_splitted(df, dir, split_by = 'id', value_name = 'x', aux_name = 'y', label_name = 'spike', label_map={1:'spike'}):
+def save_to_traineset_splitted(df, dir, split_by = 'id', value_name = 'x', aux_name = None, label_name = None, label_map={1:'spike'}):
 
     for id, grp in df.groupby(split_by):
         # gdf = grp.sort_values(["time"]).reset_index(drop=True).copy()
@@ -71,6 +74,8 @@ def load_from_trainset(dir, label_map=dict(spike=1, extra=2)):
     for k, v in label_map.items():
         df['label'].replace(k, v, inplace=True)
 
+    count = np.count_nonzero(df['label'].to_numpy())
+    print(f'Find {count} labelled samples')
 
     df.rename(columns=dict(value='x', label='y'), inplace=True)
     df.drop(['timestamp'], axis=1, inplace=True)
@@ -78,17 +83,39 @@ def load_from_trainset(dir, label_map=dict(spike=1, extra=2)):
 
 
 
+def load_cogninn(dir):
+    data = []
+    for path in sorted(glob.glob(os.path.join(dir, '*.txt'))):
+        basename = os.path.basename(path)
+        id = os.path.splitext(basename)[0]
+        csv = pd.read_csv(path, sep='\t', header=None, names=['time', 'timestamp', 'x'])
+        csv['id'] = pd.Series([id]).repeat(csv.index.size).reset_index(drop=True)
+        data.append(csv)
+
+    return pd.concat(data, ignore_index=True)
+
 
 
 if __name__ == "__main__":
+    #df = load_cogninn(DATA_DIR / '25_dec')
+    #save_to_traineset_splitted(df, DATA_DIR / '25_dec/trainset')
+
+
     #df = merge_val_folds(DATA_DIR/'82786bf6-5929-11ec-bdd4-18c04d961554')
     #os.makedirs(DATA_DIR/'dataset_refined', exist_ok=True)
     #df.to_csv(DATA_DIR/'dataset_refined/covid19_dataframe.csv')
 
     #fix_multiple_ranged(DATA_DIR / 'dataset_refined/covid19_all_filtered_ranged.csv', DATA_DIR / 'dataset_refined/covid19_all_fix_filtered_ranged.csv')
 
-    df = load_from_trainset(DATA_DIR / 'trainset')
-    df.to_csv(DATA_DIR/'covid19_refined.csv')
+    df = load_from_trainset(DATA_DIR / '21-12-2021')
+    df.to_csv(DATA_DIR/'covid19_filtered.csv')
+
+    df_negative = load_cogninn(DATA_DIR / 'TEST')
+    df_negative['y'] = pd.Series([0]).repeat(df_negative.index.size).reset_index(drop=True)
+    df_negative.drop(['timestamp'], axis=1, inplace=True)
+
+    df_all = pd.concat([df, df_negative], ignore_index=True)
+    df_all.to_csv(DATA_DIR / 'covid19_merged.csv')
 
     #df = pd.read_csv(DATA_DIR/'dataset_refined/covid19_refined4_dataframe.csv',index_col=0)
     #save_dataframe_as_traineset(df, DATA_DIR / 'trainset')
