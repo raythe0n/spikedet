@@ -1,3 +1,4 @@
+wheel
 numpy~=1.20.0
 torch~=1.10.0+cu113
 scikit-learn~=0.24.1
