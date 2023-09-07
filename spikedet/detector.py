@@ -13,12 +13,22 @@ from spikedet import DATA_DIR
 from spikedet.dataset.trainset import save_to_traineset
 from spikedet import CARDIO_RR_MEAN, CARDIO_RR_SCALE
 
+
+
 '''
 SpikeDetector - Base detector of spikes 
 '''
 class SpikeDetector:
 
-    def __init__(self, path_to_model: str, win_size : int = 32, threshold = 0.5, batch_size : int = 64, device=None):
+    def __init__(self,
+                 path_to_model: str,
+                 win_size: int = 32,
+                 threshold=0.5,
+                 batch_size: int = 64,
+                 device=None,
+                 residual_channels=32,
+                 skip_channels=72,
+                 ):
         self.threshold = threshold
         if device is None:
             self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -32,7 +42,10 @@ class SpikeDetector:
         if not isinstance(self.model, SpikeNet):
             pretrained_dict = self.model['state_dict']
             pretrained_dict = {key.replace("model.", ""): value for key, value in pretrained_dict.items() if 'model.' in key}
-            self.model = SpikeNet()
+            self.model = SpikeNet(
+                residual_channels=residual_channels,
+                skip_channels=skip_channels
+            )
             self.model.load_state_dict(pretrained_dict)
         self.model.to(self.device)
         self.model.eval()
@@ -70,15 +83,31 @@ class SpikeDetector:
             return dets.detach().numpy(), y.detach().numpy()
         return dets.detach().numpy()
 
+
 '''
 SpikeDetectorOnline - Buffered detector for online data. Slightly slow. 
 '''
-
 class SpikeDetectorOnline(SpikeDetector):
 
-    def __init__(self, path_to_model: str, win_size : int = 32, threshold = 0.5, buffer_size : int = 64, device=None):
-        assert buffer_size >= win_size
-        super(SpikeDetectorOnline, self).__init__(path_to_model, win_size, threshold, 1, device)
+    def __init__(self,
+                 path_to_model: str,
+                 win_size: int = 32,
+                 threshold=0.5,
+                 batch_size: int = 64,
+                 device=None,
+                 residual_channels=32,
+                 skip_channels=72,
+                 ):
+        assert batch_size >= win_size
+        super(SpikeDetectorOnline, self).__init__(
+            path_to_model=path_to_model,
+            win_size=win_size,
+            threshold=threshold,
+            batch_size=batch_size,
+            device=device,
+            residual_channels=residual_channels,
+            skip_channels=skip_channels
+        )
         self.ring = torch.zeros(2*win_size, dtype=torch.float32, device=self.device)
         self.underflow_index = 0
         self.data_index = 0
